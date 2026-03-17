@@ -7,83 +7,138 @@ export class SVSimulatorEngine {
 
   simulate() {
     this.timeline = [];
+    if (!this.ast || !this.ast.top) return [];
     
-    // Initial State at t=0
-    let currentState = {
-      'tb.clk': 0,
-      'tb.reset': 1,
-      'tb.a': 5,
-      'tb.b': 2,
-      'tb.sum': 0,
-      'tb.diff': 0,
-      'tb.prod': 0,
-      'tb.add_uut.clk': 0,
-      'tb.add_uut.a': 5,
-      'tb.add_uut.b': 2,
-      'tb.add_uut.out': 0,
-      'tb.sub_uut.clk': 0,
-      'tb.sub_uut.a': 5,
-      'tb.sub_uut.b': 2,
-      'tb.sub_uut.out': 0,
-      'tb.mult_uut.clk': 0,
-      'tb.mult_uut.a': 5,
-      'tb.mult_uut.b': 2,
-      'tb.mult_uut.out': 0,
-    };
+    // Dynamically initialize state based on TB signals and ports
+    let currentState = {};
+    const top = this.ast.top;
+    
+    // Initialize TB signals (defaults)
+    top.signals.forEach(sig => {
+        currentState[`${top.name}.${sig.name}`] = 0;
+    });
+
+    // Initialize module instances
+    top.instances.forEach(inst => {
+      const modDef = this.ast.modules.find(m => m.name === inst.type);
+      if (modDef) {
+        modDef.ports.forEach(p => currentState[`${top.name}.${inst.name}.${p.name}`] = 0);
+        modDef.signals.forEach(s => currentState[`${top.name}.${inst.name}.${s.name}`] = 0);
+      }
+    });
+
+    // Hardcode initial Testbench state injections for demo purposes
+    // (A full simulator would evaluate 'initial' blocks properly here)
+    currentState['tb.clk'] = 0;
+    currentState['tb.reset'] = 1;
+    currentState['tb.a'] = 5;
+    currentState['tb.b'] = 2;
     
     this.recordState(0, currentState);
 
-    let clk = 0;
-    let reset = 1;
-    let a = 5;
-    let b = 2;
-    let sum = 0;
-    let diff = 0;
-    let prod = 0;
+    let nextState = { ...currentState };
 
-    // Simulate up to maxTime
     for (let t = 1; t <= this.maxTime; t++) {
       let changed = false;
 
-      if (t === 10) { reset = 0; changed = true; }
-      if (t === 30) { a = 10; b = 3; changed = true; }
-      if (t === 60) { a = 15; b = 5; changed = true; }
+      // TB Stimulus (Hardcoded time steps for now, but dynamic logic payload)
+      if (t === 10) { nextState['tb.reset'] = 0; changed = true; }
+      if (t === 30) { nextState['tb.a'] = 10; nextState['tb.b'] = 3; changed = true; }
+      if (t === 60) { nextState['tb.a'] = 15; nextState['tb.b'] = 5; changed = true; }
 
-      // clk always block logic
+      // Clock driver
       if (t % 5 === 0) {
-        clk = clk === 0 ? 1 : 0;
+        nextState['tb.clk'] = nextState['tb.clk'] === 0 ? 1 : 0;
         changed = true;
-
-        if (clk === 1) {
-          sum = (a + b) & 255;
-          diff = (a - b) & 255;
-          prod = (a * b) & 65535;
-        }
       }
 
       if (changed) {
-        currentState = {
-          'tb.clk': clk,
-          'tb.reset': reset,
-          'tb.a': a,
-          'tb.b': b,
-          'tb.sum': sum,
-          'tb.diff': diff,
-          'tb.prod': prod,
-          'tb.add_uut.clk': clk,
-          'tb.add_uut.a': a,
-          'tb.add_uut.b': b,
-          'tb.add_uut.out': sum,
-          'tb.sub_uut.clk': clk,
-          'tb.sub_uut.a': a,
-          'tb.sub_uut.b': b,
-          'tb.sub_uut.out': diff,
-          'tb.mult_uut.clk': clk,
-          'tb.mult_uut.a': a,
-          'tb.mult_uut.b': b,
-          'tb.mult_uut.out': prod
-        };
-        this.recordState(t, currentState);
+        // Evaluate Continuous Assignments & Always Blocks for all instances
+        top.instances.forEach(inst => {
+            const modDef = this.ast.modules.find(m => m.name === inst.type);
+            if (!modDef) return;
+
+            // Resolve inputs from TB bindings
+            Object.keys(inst.mappings).forEach(portName => {
+                const tbSig = inst.mappings[portName];
+                const tbPath = `${top.name}.${tbSig}`;
+                const portPath = `${top.name}.${inst.name}.${portName}`;
+                nextState[portPath] = nextState[tbPath];
+            });
+
+            // Execute Blocks 
+            // Triggered on posedge clk 
+            if (nextState['tb.clk'] === 1 && currentState['tb.clk'] === 0) {
+              if (modDef.blocks) {
+                modDef.blocks.forEach(block => {
+                   if (block.type === 'always' || block.type === 'assign') {
+                       // Evaluate statements
+                       block.statements?.forEach(stmt => {
+                           if (stmt.expression && stmt.expression.type === 'binary') {
+                               const leftPath = `${top.name}.${inst.name}.${stmt.expression.left}`;
+                               const rightPath = `${top.name}.${inst.name}.${stmt.expression.right}`;
+                               
+                               const leftVal = nextState[leftPath] !== undefined ? nextState[leftPath] : parseInt(stmt.expression.left) || 0;
+                               const rightVal = nextState[rightPath] !== undefined ? nextState[rightPath] : parseInt(stmt.expression.right) || 0;
+                               
+                               let result = 0;
+                               switch (stmt.expression.op) {
+                                   case '+': result = leftVal + rightVal; break;
+                                   case '-': result = leftVal - rightVal; break;
+                                   case '*': result = leftVal * rightVal; break;
+                                   case '&': result = leftVal & rightVal; break;
+                                   case '|': result = leftVal | rightVal; break;
+                                   default: result = leftVal;
+                               }
+                               
+                               // Keep simple bounds check
+                               result = result & 0xFFFF; // 16-bit max cap
+                               
+                               const targetPath = `${top.name}.${inst.name}.${stmt.target}`;
+                               nextState[targetPath] = result;
+                           }
+                       });
+
+                       // Continuous assigns (no statements array, just expression)
+                       if (block.type === 'assign' && block.expression && block.expression.type === 'binary') {
+                           const leftPath = `${top.name}.${inst.name}.${block.expression.left}`;
+                           const rightPath = `${top.name}.${inst.name}.${block.expression.right}`;
+                           
+                           const leftVal = nextState[leftPath] !== undefined ? nextState[leftPath] : parseInt(block.expression.left) || 0;
+                           const rightVal = nextState[rightPath] !== undefined ? nextState[rightPath] : parseInt(block.expression.right) || 0;
+                           
+                           let result = 0;
+                           switch (block.expression.op) {
+                               case '+': result = leftVal + rightVal; break;
+                               case '-': result = leftVal - rightVal; break;
+                               case '*': result = leftVal * rightVal; break;
+                               case '&': result = leftVal & rightVal; break;
+                               case '|': result = leftVal | rightVal; break;
+                               default: result = leftVal;
+                           }
+                           
+                           result = result & 0xFFFF;
+                           const targetPath = `${top.name}.${inst.name}.${block.target}`;
+                           nextState[targetPath] = result;
+                       }
+                   }
+                });
+              }
+            }
+
+            // Propagate outputs back to TB
+            modDef.ports.filter(p => p.direction === 'output').forEach(port => {
+                const tbSig = inst.mappings[port.name];
+                if (tbSig) {
+                    const tbPath = `${top.name}.${tbSig}`;
+                    const portPath = `${top.name}.${inst.name}.${port.name}`;
+                    nextState[tbPath] = nextState[portPath];
+                }
+            });
+        });
+
+        this.recordState(t, nextState);
+        currentState = { ...nextState }; // Commit state
       }
     }
 
@@ -91,7 +146,6 @@ export class SVSimulatorEngine {
   }
 
   recordState(time, state) {
-    // Deep copy state object
     this.timeline.push({
       time: time,
       state: { ...state }

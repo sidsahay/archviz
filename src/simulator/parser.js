@@ -19,7 +19,8 @@ export function parseVerilog(code) {
       name,
       ports: parsePorts(portsStr, bodyStr),
       instances: parseInstances(bodyStr),
-      signals: parseSignals(bodyStr)
+      signals: parseSignals(bodyStr),
+      blocks: parseBlocks(bodyStr)
     };
     ast.modules.push(moduleObj);
   }
@@ -108,4 +109,70 @@ function parseWidth(widthStr) {
     return Math.abs(parseInt(match[1]) - parseInt(match[2])) + 1;
   }
   return 1;
+}
+
+function parseBlocks(bodyStr) {
+  const blocks = [];
+  
+  // Extract continuous assignments: assign out = a + b;
+  const assignRegex = /assign\s+(\w+)\s*=\s*(.*?);/g;
+  let aMatch;
+  while ((aMatch = assignRegex.exec(bodyStr)) !== null) {
+    blocks.push({
+      type: 'assign',
+      target: aMatch[1],
+      expression: parseExpression(aMatch[2].trim())
+    });
+  }
+
+  // Extract initial/always blocks (basic assignment extraction for now)
+  const blockRegex = /(initial|always.*?)\s+begin([\s\S]*?)end/g;
+  let bMatch;
+  while ((bMatch = blockRegex.exec(bodyStr)) !== null) {
+    const blockType = bMatch[1].startsWith('always') ? 'always' : 'initial';
+    const conditionMatch = bMatch[1].match(/always\s*@\s*\((.*?)\)/);
+    const condition = conditionMatch ? conditionMatch[1] : null;
+    
+    const statementsStr = bMatch[2];
+    const statements = [];
+    
+    // Extract block assignments: out = a + b; or out <= a + b;
+    const stmtRegex = /(\w+)\s*(<=|=)\s*(.*?);/g;
+    let sMatch;
+    while ((sMatch = stmtRegex.exec(statementsStr)) !== null) {
+       statements.push({
+           target: sMatch[1],
+           operator: sMatch[2],
+           expression: parseExpression(sMatch[3].trim())
+       });
+    }
+
+    blocks.push({
+      type: blockType,
+      condition,
+      statements
+    });
+  }
+
+  return blocks;
+}
+
+function parseExpression(exprStr) {
+  // Try mapping generic binary operations: a + b, a - b, a * b, a & b
+  const binOpRegex = /([a-zA-Z0-9_]+)\s*([\+\-\*\/\&\|\^])\s*([a-zA-Z0-9_]+)/;
+  const m = exprStr.match(binOpRegex);
+  if (m) {
+      return {
+          type: 'binary',
+          left: m[1],
+          op: m[2],
+          right: m[3]
+      };
+  }
+  
+  // If no binary op, treat as a single literal or variable
+  return {
+      type: 'literal',
+      value: exprStr
+  };
 }
