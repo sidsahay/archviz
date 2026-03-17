@@ -1,0 +1,184 @@
+:root {
+  --bg-dark: #0f1115;
+  --bg-panel: #1a1d24;
+  --bg-header: #14171c;
+  --border-color: #2b303b;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --success: #10b981;
+  
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', Courier, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.app-header {
+  height: 56px;
+  background-color: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+  color: var(--text-main);
+}
+
+.logo svg {
+  color: var(--accent);
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+/* Main Content & Split Panes */
+.app-content {
+  flex: 1;
+  display: flex;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+}
+
+.split-pane {
+  background-color: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane-header {
+  height: 40px;
+  background-color: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Split.js Gutters */
+.gutter {
+  background-color: var(--bg-dark);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  z-index: 5;
+}
+.gutter.gutter-horizontal {
+  cursor: col-resize;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="20" viewBox="0 0 4 20"><circle cx="2" cy="2" r="1.5" fill="%2364748b"/><circle cx="2" cy="10" r="1.5" fill="%2364748b"/><circle cx="2" cy="18" r="1.5" fill="%2364748b"/></svg>');
+}
+.gutter.gutter-vertical {
+  cursor: row-resize;
+  border-left: none;
+  border-right: none;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="4" viewBox="0 0 20 4"><circle cx="2" cy="2" r="1.5" fill="%2364748b"/><circle cx="10" cy="2" r="1.5" fill="%2364748b"/><circle cx="18" cy="2" r="1.5" fill="%2364748b"/></svg>');
+}
+
+/* Editor */
+#editor-container {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Visualizer */
+#canvas-container {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  background-color: #12141a;
+  background-image: radial-gradient(#2b303b 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Timeline */
+#timeline-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+#time-scrubber {
+  width: 100%;
+  margin-bottom: 20px;
+  accent-color: var(--accent);
+}
+
+#signals-view {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
